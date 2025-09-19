@@ -1,0 +1,1796 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Voice Assistant</title>
+<style>
+* { 
+  box-sizing: border-box; 
+  margin: 0; 
+  padding: 0; 
+}
+
+:root {
+  --vh: 1vh;
+}
+
+html, body {
+  height: 100vh;
+  height: 100dvh; /* Dynamic viewport height for mobile */
+  height: -webkit-fill-available; /* Safari mobile fix */
+  width: 100%;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: #0d1117;
+  color: #e6edf3;
+  display: flex; 
+  flex-direction: column;
+  overflow: hidden;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.app-container {
+  width: 100%;
+  height: 100vh;
+  height: 100dvh;
+  height: -webkit-fill-available;
+  display: flex;
+  flex-direction: column;
+  background: #0d1117;
+  position: relative;
+  overflow: hidden;
+  padding: env(safe-area-inset-top, 0) env(safe-area-inset-right, 0) env(safe-area-inset-bottom, 0) env(safe-area-inset-left, 0);
+}
+
+#mode-bar {
+  display: flex; 
+  gap: 0; 
+  padding: max(8px, env(safe-area-inset-top, 8px)) 8px 8px 8px;
+  background: #161b22;
+  border-bottom: 1px solid #21262d;
+  box-shadow: 0 1px 0 rgba(255,255,255,0.03);
+  flex-shrink: 0;
+  z-index: 10;
+}
+
+#mode-bar button {
+  flex: 1; 
+  padding: 16px 12px; 
+  font-size: 15px; 
+  font-weight: 600;
+  border: none; 
+  cursor: pointer; 
+  transition: all 0.2s ease;
+  background: transparent;
+  color: #e6edf3;
+  border-radius: 0;
+  min-height: 48px; /* Touch target size */
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  position: relative;
+}
+
+#mode-bar button.active { 
+  background: #21262d;
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+
+#mode-bar button:first-child.active {
+  border-radius: 8px 0 0 8px;
+}
+
+#mode-bar button:last-child.active {
+  border-radius: 0 8px 8px 0;
+}
+
+#mode-bar button:only-child.active {
+  border-radius: 8px;
+}
+
+/* Haptic feedback simulation */
+#mode-bar button:active {
+  transform: scale(0.98);
+  background: #30363d;
+}
+
+#chat-container {
+  flex: 1; 
+  overflow-y: auto; 
+  overflow-x: hidden;
+  padding: 16px;
+  background: #0d1117;
+  scroll-behavior: smooth;
+  scrollbar-width: thin;
+  scrollbar-color: #30363d transparent;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  -webkit-scroll-behavior: smooth;
+  position: relative;
+}
+
+#chat-container::-webkit-scrollbar {
+  width: 4px;
+}
+
+#chat-container::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+#chat-container::-webkit-scrollbar-thumb {
+  background: #30363d;
+  border-radius: 2px;
+}
+
+.welcome-message {
+  text-align: center;
+  padding: 40px 20px;
+  color: #7d8590;
+  animation: fadeIn 0.5s ease;
+}
+
+.welcome-message h2 {
+  font-size: 24px;
+  margin-bottom: 8px;
+  color: #e6edf3;
+}
+
+.welcome-message p {
+  font-size: 16px;
+}
+
+.message-group { 
+  margin-bottom: 16px; 
+  animation: slideUp 0.3s ease;
+}
+
+.message {
+  display: flex; 
+  align-items: flex-start; 
+  margin-bottom: 2px;
+  max-width: 100%;
+  padding: 12px 0;
+}
+
+.message.user { 
+  justify-content: flex-end; 
+}
+
+.message.bot { 
+  justify-content: flex-start;
+  background: #161b22;
+  margin: 0 -16px;
+  padding: 16px;
+  border-radius: 0;
+  position: relative;
+}
+
+.bubble {
+  max-width: 85%; 
+  padding: 0; 
+  border-radius: 0; 
+  word-wrap: break-word;
+  font-size: 16px; 
+  line-height: 1.5;
+  position: relative;
+  margin: 0;
+  background: transparent;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  user-select: text;
+}
+
+.bubble.user {
+  background: transparent;
+  color: #e6edf3; 
+  text-align: right;
+  max-width: 90%;
+}
+
+.bubble.bot {
+  background: transparent;
+  color: #e6edf3;
+  text-align: left;
+  max-width: 100%;
+}
+
+.message-info {
+  font-size: 12px; 
+  opacity: 0.6; 
+  margin-top: 4px;
+  text-align: center;
+  width: 100%;
+  color: #7d8590;
+}
+
+.typing-indicator {
+  display: none; 
+  align-items: center; 
+  padding: 16px;
+  background: #161b22; 
+  margin: 0 -16px;
+  color: #7d8590;
+  font-size: 14px;
+}
+
+.typing-indicator .dots {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 8px;
+}
+
+.typing-indicator .dots span {
+  height: 4px; 
+  width: 4px; 
+  border-radius: 50%; 
+  background: #7d8590;
+  display: inline-block; 
+  margin: 0 2px; 
+  animation: typing 1.4s infinite;
+}
+
+.typing-indicator .dots span:nth-child(2) { animation-delay: 0.2s; }
+.typing-indicator .dots span:nth-child(3) { animation-delay: 0.4s; }
+
+.input-controls {
+  flex-shrink: 0;
+  background: #161b22;
+  border-top: 1px solid #21262d;
+  box-shadow: 0 -1px 0 rgba(255,255,255,0.03);
+  padding: 12px 16px;
+  padding-bottom: max(12px, env(safe-area-inset-bottom, 12px));
+  position: relative;
+  z-index: 10;
+}
+
+#text-mode {
+  display: flex; 
+  gap: 8px; 
+  align-items: center;
+}
+
+#text-mode .input-container {
+  flex: 1; 
+  display: flex; 
+  gap: 8px; 
+  align-items: center;
+  background: #21262d;
+  border-radius: 12px; 
+  padding: 4px 4px 4px 16px;
+  border: 1px solid #30363d;
+  min-height: 48px;
+  transition: border-color 0.2s ease;
+}
+
+#text-mode .input-container:focus-within {
+  border-color: #539bf5;
+  box-shadow: 0 0 0 2px rgba(83, 155, 245, 0.1);
+}
+
+#text-mode input {
+  flex: 1; 
+  padding: 12px 0; 
+  font-size: 16px; 
+  border: none; 
+  outline: none;
+  background: transparent; 
+  color: #e6edf3;
+  min-height: 24px;
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  user-select: text;
+}
+
+#text-mode input::placeholder { 
+  color: #7d8590; 
+}
+
+.btn {
+  padding: 10px; 
+  border-radius: 8px; 
+  border: none; 
+  cursor: pointer;
+  font-size: 18px; 
+  transition: all 0.2s ease; 
+  display: flex;
+  align-items: center; 
+  justify-content: center; 
+  min-width: 48px; 
+  min-height: 48px;
+  background: transparent;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  position: relative;
+  overflow: hidden;
+}
+
+.btn:active {
+  transform: scale(0.95);
+}
+
+.btn-primary { 
+  background: #1a1f24; 
+  color: #539bf5;
+  border: 1px solid #30363d;
+  font-size: 20px;
+  transition: all 0.2s ease;
+}
+
+.btn-primary:hover, .btn-primary:active { 
+  background: #21262d;
+  color: #77b3f7;
+  box-shadow: 0 2px 8px rgba(83, 155, 245, 0.2);
+}
+
+.btn-danger { 
+  background: #ef4444; 
+  color: #fff; 
+}
+
+.btn-danger:hover, .btn-danger:active { 
+  background: #dc2626;
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3);
+}
+
+.btn-mic { 
+  background: #21262d;
+  color: #e6edf3;
+  border: 1px solid #30363d;
+}
+
+.btn-mic:hover, .btn-mic:active { 
+  background: #30363d; 
+}
+
+.btn-mic.recording { 
+  background: #ef4444; 
+  color: #fff;
+  animation: pulse 1s infinite; 
+  border-color: #dc2626;
+}
+
+.btn-speaker {
+  background: #21262d;
+  color: #e6edf3;
+  border: 1px solid #30363d;
+}
+
+.btn-speaker:hover, .btn-speaker:active {
+  background: #30363d;
+}
+
+.btn-speaker.speaking {
+  background: #21262d;
+  color: #77b3f7;
+  border: 1px solid #539bf5;
+  animation: speakPulse 1s infinite;
+}
+
+.btn-speaker.muted {
+  color: #7d8590;
+  background: #1a1f24;
+}
+
+#voice-mode, #voice-cont-mode {
+  display: none;
+  justify-content: center; 
+  text-align: center; 
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px 16px;
+  align-items: center;
+}
+
+#voice-mode .status, #voice-cont-mode .status {
+  font-size: 16px; 
+  color: #7d8590;
+  margin-bottom: 8px;
+  text-align: center;
+}
+
+#voice-mode .controls, #voice-cont-mode .controls {
+  display: flex; 
+  gap: 12px; 
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+/* Status indicators */
+.status-indicator {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #28a745;
+  animation: statusBlink 2s infinite;
+}
+
+.status-indicator.error {
+  background: #ef4444;
+}
+
+.status-indicator.warning {
+  background: #ffc107;
+}
+
+/* Keyboard shortcut hints */
+.shortcut-hint {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #21262d;
+  color: #7d8590;
+  font-size: 11px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+  z-index: 20;
+}
+
+.btn:hover .shortcut-hint {
+  opacity: 1;
+}
+
+/* Animations */
+@keyframes pulse {
+  0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+  70% { transform: scale(1.05); box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+  100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+}
+
+@keyframes speakPulse {
+  0% { box-shadow: 0 0 0 0 rgba(83, 155, 245, 0.7); }
+  70% { box-shadow: 0 0 0 6px rgba(83, 155, 245, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(83, 155, 245, 0); }
+}
+
+@keyframes typing {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+  30% { transform: translateY(-8px); opacity: 1; }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes statusBlink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0.3; }
+}
+
+/* Mobile-First Responsive Design */
+
+/* Small phones (320px - 375px) */
+@media (max-width: 375px) {
+  #mode-bar button { 
+    padding: 12px 6px; 
+    font-size: 13px; 
+    min-height: 44px;
+  }
+  
+  .bubble { 
+    font-size: 14px;
+    line-height: 1.4;
+  }
+  
+  .bubble.user {
+    max-width: 95%;
+  }
+  
+  .btn {
+    min-width: 44px;
+    min-height: 44px;
+    padding: 8px;
+    font-size: 16px;
+  }
+  
+  #text-mode .input-container {
+    min-height: 44px;
+    padding: 2px 2px 2px 12px;
+  }
+  
+  #text-mode input {
+    font-size: 16px; /* Prevents zoom on iOS */
+    padding: 10px 0;
+  }
+  
+  .input-controls {
+    padding: 8px 10px;
+    padding-bottom: max(8px, env(safe-area-inset-bottom, 8px));
+  }
+  
+  #voice-mode .controls, #voice-cont-mode .controls {
+    gap: 8px;
+  }
+  
+  .welcome-message {
+    padding: 20px 15px;
+  }
+  
+  .welcome-message h2 {
+    font-size: 20px;
+  }
+}
+
+/* Standard phones (376px - 414px) */
+@media (min-width: 376px) and (max-width: 414px) {
+  #mode-bar button { 
+    padding: 14px 8px; 
+    font-size: 14px; 
+    min-height: 46px;
+  }
+  
+  .bubble { 
+    font-size: 15px;
+    line-height: 1.5;
+  }
+  
+  .btn {
+    min-width: 46px;
+    min-height: 46px;
+  }
+  
+  #text-mode .input-container {
+    min-height: 46px;
+  }
+}
+
+/* Large phones (415px - 480px) */
+@media (min-width: 415px) and (max-width: 480px) {
+  .bubble { 
+    font-size: 16px;
+  }
+  
+  .btn {
+    min-width: 48px;
+    min-height: 48px;
+  }
+  
+  #text-mode .input-container {
+    min-height: 48px;
+  }
+}
+
+/* Tablets and larger screens */
+@media (min-width: 768px) {
+  .app-container {
+    max-width: 768px;
+    margin: 0 auto;
+  }
+  
+  .bubble {
+    font-size: 17px;
+    max-width: 80%;
+  }
+  
+  #chat-container {
+    padding: 24px;
+  }
+  
+  .input-controls {
+    padding: 16px 24px;
+    padding-bottom: max(16px, env(safe-area-inset-bottom, 16px));
+  }
+  
+  .welcome-message {
+    padding: 60px 40px;
+  }
+}
+
+/* Landscape orientation optimizations */
+@media (orientation: landscape) and (max-height: 500px) {
+  #mode-bar {
+    padding: 4px 8px;
+  }
+  
+  #mode-bar button {
+    padding: 8px 10px;
+    min-height: 36px;
+    font-size: 13px;
+  }
+  
+  .welcome-message {
+    padding: 20px;
+  }
+  
+  .welcome-message h2 {
+    font-size: 20px;
+  }
+  
+  .input-controls {
+    padding: 8px 12px;
+    padding-bottom: max(8px, env(safe-area-inset-bottom, 8px));
+  }
+  
+  .btn {
+    min-width: 40px;
+    min-height: 40px;
+  }
+  
+  #text-mode .input-container {
+    min-height: 40px;
+  }
+  
+  #chat-container {
+    padding: 12px 16px;
+  }
+}
+
+/* High DPI displays */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+  .btn {
+    border-width: 0.5px;
+  }
+  
+  #mode-bar button {
+    border-width: 0.5px;
+  }
+}
+
+/* Accessibility improvements */
+@media (prefers-reduced-motion: reduce) {
+  .btn, .typing-indicator .dots span, .btn-mic.recording, .btn-speaker.speaking {
+    animation: none !important;
+  }
+  
+  .message-group, .welcome-message {
+    animation: none !important;
+  }
+  
+  * {
+    transition: none !important;
+  }
+}
+
+/* Large text support */
+@media (prefers-font-size: large) {
+  .bubble {
+    font-size: 18px;
+    line-height: 1.6;
+  }
+  
+  #mode-bar button {
+    font-size: 17px;
+    padding: 16px 14px;
+  }
+  
+  .btn {
+    font-size: 20px;
+  }
+}
+
+/* Dark mode refinements */
+@media (prefers-color-scheme: dark) {
+  .app-container {
+    background: #0d1117;
+  }
+  
+  #mode-bar {
+    background: #161b22;
+  }
+  
+  .input-controls {
+    background: #161b22;
+  }
+}
+
+/* Focus indicators for keyboard navigation */
+.btn:focus-visible {
+  outline: 2px solid #539bf5;
+  outline-offset: 2px;
+}
+
+#text-mode input:focus {
+  outline: none;
+}
+
+/* Touch feedback improvements */
+@media (hover: none) {
+  .btn:hover {
+    transform: none;
+    background: inherit;
+    color: inherit;
+  }
+  
+  .btn:active {
+    transform: scale(0.95);
+    transition: transform 0.1s ease;
+  }
+  
+  #mode-bar button:hover {
+    background: inherit;
+  }
+  
+  #mode-bar button:active {
+    background: #30363d;
+  }
+}
+
+/* Prevent zoom on iOS double tap */
+.btn, #mode-bar button {
+  touch-action: manipulation;
+}
+
+/* Loading states */
+.btn.loading {
+  pointer-events: none;
+  opacity: 0.7;
+}
+
+.btn.loading::after {
+  content: '';
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  border: 2px solid transparent;
+  border-top: 2px solid currentColor;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Connection status indicator */
+.connection-status {
+  position: absolute;
+  top: 50%;
+  right: 16px;
+  transform: translateY(-50%);
+  font-size: 12px;
+  color: #7d8590;
+  display: none;
+}
+
+.connection-status.offline {
+  display: block;
+  color: #ef4444;
+}
+
+.connection-status.online {
+  display: block;
+  color: #28a745;
+}
+</style>
+</head>
+<body>
+
+<div class="app-container">
+  <div id="mode-bar">
+    <button id="chatModeBtn" class="active" onclick="switchMode('chat')">
+      Text
+      <div class="shortcut-hint">Ctrl+1</div>
+    </button>
+    <button id="voiceBtn" onclick="switchMode('voice')">
+      Voice
+      <div class="shortcut-hint">Ctrl+2</div>
+    </button>
+    <button id="voiceContBtn" onclick="switchMode('voice-cont')">
+      Continuous
+      <div class="shortcut-hint">Ctrl+3</div>
+    </button>
+  </div>
+
+  <div id="chat-container">
+    <div class="welcome-message">
+      <h2>AI Assistant</h2>
+      <p>Send a message or use voice to get started</p>
+      <div class="connection-status" id="connectionStatus">●</div>
+    </div>
+  </div>
+
+  <div class="typing-indicator" id="typing-indicator">
+    Generating response<div class="dots"><span></span><span></span><span></span></div>
+  </div>
+
+  <div class="input-controls">
+    <div id="text-mode">
+      <div class="input-container">
+        <input id="textInput" placeholder="Message" 
+               onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault(); sendTextMessage();}">
+        <button class="btn btn-mic" id="micBtn" onclick="toggleChatMic()">
+          🎙️
+          <div class="shortcut-hint">Ctrl+M</div>
+        </button>
+      </div>
+      <button class="btn btn-speaker" id="speakerBtn" onclick="toggleSpeaker()" title="Toggle speech">
+        🔊
+        <div class="shortcut-hint">Ctrl+S</div>
+      </button>
+      <button class="btn btn-primary" onclick="sendTextMessage()">
+        📩
+        <div class="shortcut-hint">Enter</div>
+      </button>
+      <button class="btn btn-danger" onclick="stopAll()">
+        ⏹️
+        <div class="shortcut-hint">Esc</div>
+      </button>
+    </div>
+
+    <div id="voice-mode">
+      <div class="status">Voice Chat Mode - Tap to speak</div>
+      <div class="controls">
+        <button class="btn btn-primary" onclick="startVoice()">
+          🎙️
+          <div class="shortcut-hint">Space</div>
+        </button>
+        <button class="btn btn-speaker" id="voiceSpeakerBtn" onclick="toggleSpeaker()" title="Toggle speech">
+          🔊
+          <div class="shortcut-hint">Ctrl+S</div>
+        </button>
+        <button class="btn btn-danger" onclick="stopAll()">
+          ⏹️
+          <div class="shortcut-hint">Esc</div>
+        </button>
+      </div>
+    </div>
+
+    <div id="voice-cont-mode">
+      <div class="status">Continuous listening active</div>
+      <div class="controls">
+        <button class="btn btn-speaker" id="contSpeakerBtn" onclick="toggleSpeaker()" title="Toggle speech">
+          🔊
+          <div class="shortcut-hint">Ctrl+S</div>
+        </button>
+        <button class="btn btn-danger" onclick="stopAll()">
+          ⏹️
+          <div class="shortcut-hint">Esc</div>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+let apiBase = "https://voice-assistant-program.onrender.com";
+let speechEnabled = true, utter = null, audioUnlocked = false;
+let currentMode = 'chat', chatMicActive = false, isProcessing = false;
+let connectionOnline = true;
+
+// CREATE ONCE - NEVER CREATE AGAIN
+let recognition = null;
+let recognitionActive = false;
+
+// Mobile-specific variables
+let lastTouchTime = 0;
+let isKeyboardOpen = false;
+let originalViewportHeight = window.innerHeight;
+
+// Initialize everything when page loads
+window.onload = () => {
+  initializeMobileOptimizations();
+  addWelcomeMessage();
+  updateSpeakerButtons();
+  initializeConnectionMonitoring();
+  
+  // Create speech recognition ONCE here
+  if (window.webkitSpeechRecognition || window.SpeechRecognition) {
+    const SpeechRecognition = window.webkitSpeechRecognition || window.SpeechRecognition;
+    recognition = new SpeechRecognition();
+    recognition.lang = "en-US";
+    console.log("✅ Speech recognition created successfully!");
+  } else {
+    console.log("❌ Speech recognition not supported in this browser");
+  }
+};
+
+// Mobile-specific initialization
+function initializeMobileOptimizations() {
+  // Prevent viewport zoom on input focus (iOS)
+  const textInput = document.getElementById('textInput');
+  if (textInput) {
+    textInput.addEventListener('focus', handleInputFocus);
+    textInput.addEventListener('blur', handleInputBlur);
+  }
+  
+  // Handle orientation changes
+  window.addEventListener('orientationchange', handleOrientationChange);
+  window.addEventListener('resize', handleViewportChange);
+  
+  // Initialize viewport height
+  handleViewportChange();
+  
+  // Prevent pull-to-refresh
+  document.addEventListener('touchstart', handleTouchStart, { passive: true });
+  document.addEventListener('touchmove', handleTouchMove, { passive: false });
+  
+  // Handle visibility changes (app switching)
+  document.addEventListener('visibilitychange', handleVisibilityChange);
+  
+  // Double-tap prevention
+  document.addEventListener('touchend', handleTouchEnd, { passive: true });
+  
+  // Haptic feedback for supported devices
+  addHapticFeedback();
+}
+
+function handleInputFocus() {
+  isKeyboardOpen = true;
+  // Scroll to input on keyboard open (mobile)
+  setTimeout(() => {
+    const inputControls = document.querySelector('.input-controls');
+    if (inputControls) {
+      inputControls.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }, 300);
+}
+
+function handleInputBlur() {
+  isKeyboardOpen = false;
+  setTimeout(handleViewportChange, 300);
+}
+
+function handleOrientationChange() {
+  setTimeout(() => {
+    window.scrollTo(0, 0);
+    handleViewportChange();
+    const container = document.getElementById('chat-container');
+    if (container) {
+      container.scrollTop = container.scrollHeight;
+    }
+  }, 100);
+}
+
+function handleViewportChange() {
+  const vh = window.innerHeight * 0.01;
+  document.documentElement.style.setProperty('--vh', `${vh}px`);
+  
+  // Handle iOS Safari keyboard
+  if (isKeyboardOpen && window.innerHeight < originalViewportHeight * 0.75) {
+    document.body.style.height = `${window.innerHeight}px`;
+  } else {
+    document.body.style.height = '100vh';
+    if (!isKeyboardOpen) {
+      originalViewportHeight = window.innerHeight;
+    }
+  }
+}
+
+function handleVisibilityChange() {
+  if (document.hidden) {
+    // App went to background
+    if (speechSynthesis.speaking) {
+      speechSynthesis.pause();
+    }
+  } else {
+    // App came to foreground
+    if (speechSynthesis.speaking) {
+      speechSynthesis.resume();
+    }
+    checkConnection();
+  }
+}
+
+// Prevent double-tap zoom
+let yDown = null;
+function handleTouchStart(evt) {
+  const firstTouch = (evt.touches || evt.originalEvent.touches)[0];
+  yDown = firstTouch.clientY;
+}
+
+function handleTouchMove(evt) {
+  if (!yDown) return;
+  
+  const yUp = evt.touches[0].clientY;
+  const yDiff = yDown - yUp;
+  
+  // Prevent pull-to-refresh when at top
+  if (yDiff < 0 && window.scrollY === 0) {
+    evt.preventDefault();
+  }
+  
+  yDown = null;
+}
+
+function handleTouchEnd(evt) {
+  const currentTime = new Date().getTime();
+  const tapLength = currentTime - lastTouchTime;
+  
+  // Prevent double-tap zoom
+  if (tapLength < 500 && tapLength > 0) {
+    evt.preventDefault();
+  }
+  
+  lastTouchTime = currentTime;
+}
+
+// Haptic feedback for supported devices
+function addHapticFeedback() {
+  const buttons = document.querySelectorAll('.btn');
+  buttons.forEach(button => {
+    button.addEventListener('touchstart', () => {
+      // Vibrate on supported devices (Android primarily)
+      if ('vibrate' in navigator) {
+        navigator.vibrate(10);
+      }
+    });
+  });
+}
+
+// Connection monitoring
+function initializeConnectionMonitoring() {
+  window.addEventListener('online', () => {
+    connectionOnline = true;
+    updateConnectionStatus();
+  });
+  
+  window.addEventListener('offline', () => {
+    connectionOnline = false;
+    updateConnectionStatus();
+  });
+  
+  // Initial check
+  checkConnection();
+}
+
+function checkConnection() {
+  connectionOnline = navigator.onLine;
+  updateConnectionStatus();
+  
+  // Test actual connectivity
+  fetch(apiBase + '/health', { 
+    method: 'GET',
+    timeout: 5000 
+  })
+  .then(() => {
+    connectionOnline = true;
+    updateConnectionStatus();
+  })
+  .catch(() => {
+    connectionOnline = false;
+    updateConnectionStatus();
+  });
+}
+
+function updateConnectionStatus() {
+  const status = document.getElementById('connectionStatus');
+  if (connectionOnline) {
+    status.className = 'connection-status online';
+    status.textContent = '● Online';
+  } else {
+    status.className = 'connection-status offline';
+    status.textContent = '● Offline';
+  }
+}
+
+// Enhanced chat microphone functions
+function startChatMic() {
+  if (!recognition) {
+    addMessage("Voice recognition not supported in this browser", "bot", "error");
+    return;
+  }
+  
+  if (recognitionActive) {
+    console.log("Recognition already active, stopping");
+    stopChatMic();
+    return;
+  }
+  
+  if (speechSynthesis.speaking) speechSynthesis.cancel();
+  
+  const micBtn = document.getElementById('micBtn');
+  micBtn.classList.add('recording');
+  micBtn.classList.add('loading');
+  chatMicActive = true;
+  
+  recognition.continuous = false;
+  recognition.interimResults = false;
+  recognition.maxAlternatives = 1;
+  
+  recognition.onstart = () => {
+    console.log("Recognition started");
+    recognitionActive = true;
+    micBtn.classList.remove('loading');
+  };
+  
+  recognition.onresult = (e) => {
+    const transcript = e.results[0][0].transcript;
+    const confidence = e.results[0][0].confidence;
+    
+    document.getElementById('textInput').value = transcript;
+    
+    // Show confidence if low
+    if (confidence < 0.7) {
+      addMessage(`I heard: "${transcript}" (${Math.round(confidence * 100)}% confident)`, "bot", "status");
+    }
+    
+    stopChatMic();
+    sendTextMessage();
+  };
+  
+  recognition.onerror = (e) => {
+    console.error('Speech error:', e.error);
+    recognitionActive = false;
+    
+    let errorMessage = "Voice recognition error. ";
+    switch(e.error) {
+      case 'no-speech':
+        errorMessage += "No speech detected. Please try again.";
+        break;
+      case 'not-allowed':
+        errorMessage += "Microphone access denied. Please allow microphone access in your browser settings.";
+        break;
+      case 'network':
+        errorMessage += "Network error. Check your internet connection.";
+        break;
+      case 'aborted':
+        errorMessage += "Speech recognition was aborted.";
+        break;
+      default:
+        errorMessage += "Please try again.";
+    }
+    
+    addMessage(errorMessage, "bot", "error");
+    stopChatMic();
+  };
+  
+  recognition.onend = () => {
+    console.log("Recognition ended");
+    recognitionActive = false;
+    
+    if (chatMicActive) {
+      const micBtn = document.getElementById('micBtn');
+      micBtn.classList.remove('recording', 'loading');
+      chatMicActive = false;
+    }
+  };
+  
+  try {
+    recognition.start();
+    // Add haptic feedback
+    if ('vibrate' in navigator) {
+      navigator.vibrate(50);
+    }
+  } catch (error) {
+    console.error("Failed to start recognition:", error);
+    recognitionActive = false;
+    stopChatMic();
+    addMessage("Failed to start voice recognition. Please try again.", "bot", "error");
+  }
+}
+
+function stopChatMic() {
+  const micBtn = document.getElementById('micBtn');
+  micBtn.classList.remove('recording', 'loading');
+  chatMicActive = false;
+  
+  if (recognition && recognitionActive) {
+    try {
+      recognition.stop();
+    } catch (error) {
+      console.error("Error stopping recognition:", error);
+    }
+  }
+  
+  recognitionActive = false;
+}
+
+function toggleChatMic() {
+  if (chatMicActive) {
+    stopChatMic();
+  } else {
+    startChatMic();
+  }
+}
+
+// Enhanced voice mode functions
+function startVoice() {
+  if (!recognition) {
+    addMessage("Voice recognition not supported in this browser", "bot", "error");
+    return;
+  }
+  
+  if (!connectionOnline) {
+    addMessage("No internet connection. Please check your network and try again.", "bot", "error");
+    return;
+  }
+  
+  if (recognitionActive) {
+    recognition.stop();
+  }
+  
+  if (speechSynthesis.speaking) speechSynthesis.cancel();
+  
+  recognition.continuous = false;
+  recognition.interimResults = false;
+  recognition.maxAlternatives = 1;
+  
+  recognition.onstart = () => {
+    recognitionActive = true;
+    // Add haptic feedback
+    if ('vibrate' in navigator) {
+      navigator.vibrate([100, 50, 100]);
+    }
+  };
+  
+  recognition.onresult = (e) => {
+    const transcript = e.results[0][0].transcript;
+    const confidence = e.results[0][0].confidence;
+    
+    addMessage(transcript, "user");
+    
+    if (confidence < 0.6) {
+      addMessage(`I heard: "${transcript}" but I'm ${Math.round(confidence * 100)}% confident. Let me know if I misunderstood.`, "bot", "status");
+    }
+    
+    sendVoiceMessage(transcript);
+  };
+  
+  recognition.onerror = (e) => {
+    console.error('Speech error:', e);
+    let errorMessage = "I had trouble hearing you. ";
+    
+    switch(e.error) {
+      case 'no-speech':
+        errorMessage += "Please speak clearly and try again.";
+        break;
+      case 'not-allowed':
+        errorMessage += "Please allow microphone access.";
+        break;
+      default:
+        errorMessage += "Please try again.";
+    }
+    
+    addMessage(errorMessage, "bot", "error");
+    recognitionActive = false;
+  };
+  
+  recognition.onend = () => {
+    recognitionActive = false;
+  };
+  
+  recognition.start();
+  addMessage("🎙️ I'm listening... speak now!", "bot", "status");
+}
+
+// Enhanced continuous voice mode
+function startContinuousVoice() {
+  if (!recognition) {
+    addMessage("Voice recognition not supported in this browser", "bot", "error");
+    return;
+  }
+  
+  if (!connectionOnline) {
+    addMessage("No internet connection. Continuous mode requires internet access.", "bot", "error");
+    return;
+  }
+  
+  if (recognitionActive) {
+    recognition.stop();
+  }
+  
+  recognition.continuous = true;
+  recognition.interimResults = false;
+  recognition.maxAlternatives = 1;
+  
+  let silenceTimer = null;
+  let lastSpeechTime = Date.now();
+  
+  recognition.onstart = () => {
+    recognitionActive = true;
+    lastSpeechTime = Date.now();
+    // Add haptic feedback
+    if ('vibrate' in navigator) {
+      navigator.vibrate([200, 100, 200]);
+    }
+  };
+  
+  recognition.onresult = (e) => {
+    lastSpeechTime = Date.now();
+    
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      if (e.results[i].isFinal) {
+        const transcript = e.results[i][0].transcript.trim();
+        const confidence = e.results[i][0].confidence;
+        
+        if (transcript.length > 2) { // Ignore very short utterances
+          addMessage(transcript, "user");
+          
+          if (confidence < 0.6) {
+            addMessage(`(${Math.round(confidence * 100)}% confident)`, "bot", "status");
+          }
+          
+          sendVoiceMessage(transcript);
+        }
+      }
+    }
+  };
+  
+  recognition.onerror = (e) => {
+    console.error('Continuous speech error:', e);
+    recognitionActive = false;
+    
+    if (e.error !== 'aborted') {
+      addMessage(`Voice error: ${e.error}. Restarting...`, "bot", "status");
+    }
+  };
+  
+  recognition.onend = () => {
+    recognitionActive = false;
+    if (currentMode === 'voice-cont') {
+      // Restart after a delay if still in continuous mode
+      setTimeout(() => {
+        if (currentMode === 'voice-cont' && !isProcessing) {
+          startContinuousVoice();
+        }
+      }, 1000);
+    }
+  };
+  
+  recognition.start();
+  addMessage("🔄 Continuous listening activated. I'm ready to hear you anytime!", "bot", "status");
+}
+
+// Enhanced speaker functions
+function toggleSpeaker() {
+  speechEnabled = !speechEnabled;
+  updateSpeakerButtons();
+  
+  if (!speechEnabled && speechSynthesis.speaking) {
+    speechSynthesis.cancel();
+  }
+  
+  // Add haptic feedback
+  if ('vibrate' in navigator) {
+    navigator.vibrate(speechEnabled ? 30 : 60);
+  }
+  
+  // Show status
+  const statusText = speechEnabled ? "🔊 Speech enabled" : "🔇 Speech disabled";
+  addMessage(statusText, "bot", "status");
+}
+
+function updateSpeakerButtons() {
+  const buttons = ['speakerBtn', 'voiceSpeakerBtn', 'contSpeakerBtn'];
+  buttons.forEach(id => {
+    const btn = document.getElementById(id);
+    if (btn) {
+      if (speechEnabled) {
+        btn.classList.remove('muted');
+        btn.innerHTML = '🔊';
+        btn.style.color = '#e6edf3';
+        btn.style.background = '#21262d';
+      } else {
+        btn.classList.add('muted');
+        btn.innerHTML = '🔇';
+        btn.style.color = '#7d8590';
+        btn.style.background = '#1a1f24';
+      }
+    }
+  });
+}
+
+// Enhanced mode switching
+function switchMode(mode) {
+  currentMode = mode;
+  stopAll();
+  
+  document.getElementById('text-mode').style.display = mode === 'chat' ? 'flex' : 'none';
+  document.getElementById('voice-mode').style.display = mode === 'voice' ? 'flex' : 'none';
+  document.getElementById('voice-cont-mode').style.display = mode === 'voice-cont' ? 'flex' : 'none';
+  
+  document.getElementById('chatModeBtn').classList.toggle('active', mode === 'chat');
+  document.getElementById('voiceBtn').classList.toggle('active', mode === 'voice');
+  document.getElementById('voiceContBtn').classList.toggle('active', mode === 'voice-cont');
+  
+  // Add haptic feedback
+  if ('vibrate' in navigator) {
+    navigator.vibrate(25);
+  }
+  
+  if (mode === 'voice-cont') {
+    setTimeout(startContinuousVoice, 500);
+  }
+  
+  // Announce mode change
+  const modeNames = {
+    'chat': 'Text Chat',
+    'voice': 'Voice Chat', 
+    'voice-cont': 'Continuous Voice'
+  };
+  addMessage(`📱 Switched to ${modeNames[mode]} mode`, "bot", "status");
+}
+
+// Enhanced message functions
+function addWelcomeMessage() {
+  // Welcome message is in HTML, but we can enhance it
+  const welcome = document.querySelector('.welcome-message');
+  if (welcome && !connectionOnline) {
+    const p = welcome.querySelector('p');
+    p.textContent = 'Connect to internet to get started';
+    p.style.color = '#ef4444';
+  }
+}
+
+function addMessage(text, sender, type = 'text', source = '') {
+  const container = document.getElementById("chat-container");
+  const welcome = container.querySelector('.welcome-message');
+  if (welcome) welcome.style.display = 'none';
+  
+  const messageGroup = document.createElement("div");
+  messageGroup.className = "message-group";
+  
+  const message = document.createElement("div");
+  message.className = `message ${sender}`;
+  
+  const bubble = document.createElement("div");
+  bubble.className = `bubble ${sender}`;
+  bubble.textContent = text;
+  
+  // Add timestamp for mobile
+  const timestamp = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+  const timeInfo = document.createElement("div");
+  timeInfo.className = "message-info";
+  timeInfo.textContent = timestamp;
+  
+  message.appendChild(bubble);
+  
+  // Add type indicator for status messages
+  if (type === 'status' || type === 'error') {
+    const indicator = document.createElement("div");
+    indicator.className = `status-indicator ${type}`;
+    message.appendChild(indicator);
+  }
+  
+  messageGroup.appendChild(message);
+  messageGroup.appendChild(timeInfo);
+  
+  container.appendChild(messageGroup);
+  container.scrollTop = container.scrollHeight;
+  
+  // Auto-remove status messages after 5 seconds
+  if (type === 'status') {
+    setTimeout(() => {
+      if (messageGroup.parentNode) {
+        messageGroup.remove();
+      }
+    }, 5000);
+  }
+}
+
+function showTypingIndicator() {
+  const indicator = document.getElementById('typing-indicator');
+  const container = document.getElementById('chat-container');
+  container.appendChild(indicator);
+  indicator.style.display = 'flex';
+  container.scrollTop = container.scrollHeight;
+}
+
+function hideTypingIndicator() {
+  const indicator = document.getElementById('typing-indicator');
+  indicator.style.display = 'none';
+}
+
+// Enhanced send message functions
+async function sendTextMessage() {
+  const input = document.getElementById("textInput");
+  const text = input.value.trim();
+  if (!text || isProcessing) return;
+  
+  if (!connectionOnline) {
+    addMessage("❌ No internet connection. Please check your network and try again.", "bot", "error");
+    return;
+  }
+  
+  isProcessing = true;
+  stopAll();
+  
+  addMessage(text, "user");
+  input.value = "";
+  
+  // Add haptic feedback
+  if ('vibrate' in navigator) {
+    navigator.vibrate(20);
+  }
+  
+  showTypingIndicator();
+  
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+    
+    const response = await fetch(`${apiBase}/ask?question=${encodeURIComponent(text)}`, {
+      signal: controller.signal
+    });
+    
+    clearTimeout(timeoutId);
+    
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    
+    hideTypingIndicator();
+    
+    const answerText = data.answer || "I didn't receive a proper response.";
+    const source = data.source === 'gemini' ? 'AI' : (data.source === 'predefined' ? 'Quick Response' : '');
+    
+    addMessage(answerText, "bot", data.type || 'text', source);
+    
+    if (audioUnlocked && speechEnabled) {
+      const speakerBtns = document.querySelectorAll('.btn-speaker');
+      speakerBtns.forEach(btn => btn.classList.add('speaking'));
+      
+      speak(answerText, () => {
+        speakerBtns.forEach(btn => btn.classList.remove('speaking'));
+      });
+    }
+    
+  } catch (error) {
+    hideTypingIndicator();
+    console.error('Error:', error);
+    
+    let errorMessage = "I'm having trouble connecting right now. ";
+    if (error.name === 'AbortError') {
+      errorMessage = "Request timed out. Please try again.";
+    } else if (!navigator.onLine) {
+      errorMessage = "You appear to be offline. Please check your internet connection.";
+    }
+    
+    addMessage(`❌ ${errorMessage}`, "bot", "error");
+  }
+  
+  isProcessing = false;
+}
+
+async function sendVoiceMessage(text) {
+  if (speechSynthesis.speaking) speechSynthesis.cancel();
+  if (isProcessing) return;
+  
+  if (!connectionOnline) {
+    addMessage("❌ No internet connection. Please check your network and try again.", "bot", "error");
+    return;
+  }
+  
+  isProcessing = true;
+  showTypingIndicator();
+  
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
+    
+    const response = await fetch(`${apiBase}/ask?question=${encodeURIComponent(text)}`, {
+      signal: controller.signal
+    });
+    
+    clearTimeout(timeoutId);
+    
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    
+    hideTypingIndicator();
+    
+    const answerText = data.answer || "I didn't receive a proper response.";
+    const source = data.source === 'gemini' ? 'AI' : (data.source === 'predefined' ? 'Quick Response' : '');
+    
+    addMessage(answerText, "bot", data.type || 'text', source);
+    
+    if (audioUnlocked && speechEnabled) {
+      const speakerBtns = document.querySelectorAll('.btn-speaker');
+      speakerBtns.forEach(btn => btn.classList.add('speaking'));
+      
+      speak(answerText, () => {
+        speakerBtns.forEach(btn => btn.classList.remove('speaking'));
+      });
+    }
+    
+  } catch (error) {
+    hideTypingIndicator();
+    console.error('Error:', error);
+    
+    let errorMessage = "I'm having trouble connecting right now. ";
+    if (error.name === 'AbortError') {
+      errorMessage = "Request timed out. Please try again.";
+    } else if (!navigator.onLine) {
+      errorMessage = "You appear to be offline. Please check your internet connection.";
+    }
+    
+    addMessage(`❌ ${errorMessage}`, "bot", "error");
+  }
+  
+  isProcessing = false;
+}
+
+// Enhanced speech synthesis with mobile optimizations
+function speak(text, callback) {
+  if (speechSynthesis.speaking) speechSynthesis.cancel();
+  
+  utter = new SpeechSynthesisUtterance(text);
+  utter.rate = 0.85;
+  utter.pitch = 0.7;
+  utter.volume = 1.0;
+  
+  // Wait for voices to load on mobile
+  const setVoice = () => {
+    const voices = speechSynthesis.getVoices();
+    
+    // Enhanced voice selection for better mobile experience
+    const preferredVoice = voices.find(voice => 
+      voice.name.includes('David') || 
+      voice.name.includes('Mark') ||  
+      voice.name.includes('Daniel') || 
+      voice.name.includes('James') ||  
+      voice.name.includes('Thomas') || 
+      voice.name.toLowerCase().includes('male') || 
+      voice.name.includes('Google UK Male') ||
+      voice.name.includes('Microsoft David') ||
+      (voice.lang.includes('en') && voice.name.toLowerCase().includes('male'))
+    );
+    
+    if (preferredVoice) {
+      utter.voice = preferredVoice;
+    }
+  };
+  
+  // Handle voice loading on different platforms
+  if (speechSynthesis.getVoices().length === 0) {
+    speechSynthesis.addEventListener('voiceschanged', setVoice, { once: true });
+  } else {
+    setVoice();
+  }
+  
+  if (callback) {
+    utter.onend = callback;
+    utter.onerror = callback; // Also call callback on error
+  }
+  
+  // Mobile-specific speech handling
+  utter.onstart = () => {
+    // Keep screen awake during speech (if possible)
+    if ('wakeLock' in navigator && navigator.wakeLock) {
+      navigator.wakeLock.request('screen').catch(console.warn);
+    }
+  };
+  
+  speechSynthesis.speak(utter);
+}
+
+// Enhanced stop function
+function stopAll() {
+  if (recognition && recognitionActive) {
+    try {
+      recognition.stop();
+    } catch (e) {
+      console.warn('Error stopping recognition:', e);
+    }
+  }
+  
+  if (speechSynthesis.speaking) {
+    speechSynthesis.cancel();
+  }
+  
+  hideTypingIndicator();
+  isProcessing = false;
+  chatMicActive = false;
+  recognitionActive = false;
+  
+  const micBtn = document.getElementById('micBtn');
+  if (micBtn) {
+    micBtn.classList.remove('recording', 'loading');
+  }
+  
+  const speakerBtns = document.querySelectorAll('.btn-speaker');
+  speakerBtns.forEach(btn => btn.classList.remove('speaking'));
+  
+  // Add haptic feedback
+  if ('vibrate' in navigator) {
+    navigator.vibrate(100);
+  }
+  
+  addMessage("⏹️ Stopped all activities", "bot", "status");
+}
+
+// Enhanced keyboard shortcuts
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    e.preventDefault();
+    stopAll();
+  } else if (e.ctrlKey && e.key === 'm') {
+    e.preventDefault();
+    if (currentMode === 'chat') {
+      toggleChatMic();
+    }
+  } else if (e.ctrlKey && e.key === 's') {
+    e.preventDefault();
+    toggleSpeaker();
+  } else if (e.ctrlKey && e.key === '1') {
+    e.preventDefault();
+    switchMode('chat');
+  } else if (e.ctrlKey && e.key === '2') {
+    e.preventDefault();
+    switchMode('voice');
+  } else if (e.ctrlKey && e.key === '3') {
+    e.preventDefault();
+    switchMode('voice-cont');
+  } else if (e.key === ' ' && currentMode === 'voice' && document.activeElement.tagName !== 'INPUT') {
+    e.preventDefault();
+    startVoice();
+  }
+});
+
+// Audio unlock with enhanced mobile support
+let unlockAttempts = 0;
+function unlockAudio() {
+  if (!audioUnlocked && unlockAttempts < 3) {
+    unlockAttempts++;
+    const utterance = new SpeechSynthesisUtterance("");
+    utterance.volume = 0;
+    speechSynthesis.speak(utterance);
+    audioUnlocked = true;
+    console.log("✅ Audio unlocked");
+  }
+}
+
+// Multiple unlock attempts for better compatibility
+document.body.addEventListener("touchstart", unlockAudio, { once: true });
+document.body.addEventListener("click", unlockAudio, { once: true });
+document.addEventListener("DOMContentLoaded", unlockAudio);
+
+// Service worker registration for PWA features (optional)
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(console.warn);
+  });
+}
+
+// Performance monitoring
+let performanceMetrics = {
+  startTime: performance.now(),
+  speechStartTime: null,
+  responseTime: null
+};
+
+function logPerformance(action, duration) {
+  console.log(`📊 ${action}: ${duration}ms`);
+}
+
+// Memory management
+function cleanupResources() {
+  // Clean up old messages if too many
+  const messages = document.querySelectorAll('.message-group');
+  if (messages.length > 100) {
+    for (let i = 0; i < 20; i++) {
+      if (messages[i]) {
+        messages[i].remove();
+      }
+    }
+  }
+}
+
+// Run cleanup periodically
+setInterval(cleanupResources, 60000); // Every minute
+
+console.log("🚀 Mobile-optimized Voice Assistant loaded successfully!");
+</script>
+
+</body>
+</html>
